@@ -1,4 +1,3 @@
-# Fraud Detection MLOps Pipeline on AWS
 
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
 ![AWS](https://img.shields.io/badge/AWS-SageMaker-orange)
@@ -10,12 +9,15 @@
 
 ![Architecture](docs/diagrams/architecture.png)
 
+
+> This architecture mirrors real-world ML systems used in fintech and large-scale platforms where continuous model adaptation is critical.
+
 ### 🔧 Built With
 AWS Step Functions • SageMaker • Lambda • S3 • XGBoost • Python
 
 
 ## Overview
-This project implements a production-style MLOps pipeline for fraud detection on AWS. It simulates a real-world system where models must continuously adapt to changing data distributions (concept drift). The pipeline automatically detects performance degradation, retrains models, and conditionally deploys improved models using a champion/challenger framework. The system integrates AWS Step Functions, Lambda, SageMaker, and S3 to orchestrate a fully automated, state-aware machine learning lifecycle.
+This project implements a production-style MLOps pipeline for fraud detection on AWS. It simulates a real-world system where machine learning models must continuously adapt to changing data distributions (concept drift). The pipeline automatically detects performance degradation, retrains models, and conditionally deploys improved models using a champion/challenger framework. The system integrates AWS Step Functions, Lambda, SageMaker, and S3 to orchestrate a fully automated, state-aware machine learning lifecycle.
 
 ---
 
@@ -36,7 +38,6 @@ Fraud detection systems must adapt to changing transaction behavior over time. T
 
 ## 🏗️ Architecture Overview
 
-::contentReference[oaicite:0]{index=0}
 
 The pipeline orchestrates:
 - Data ingestion → preprocessing → drift detection  
@@ -83,22 +84,31 @@ This project mirrors a production-style MLOps system using AWS:
 - CloudWatch logs used to debug pipeline across distributed services
 
 ## Workflow
-1. Raw transaction data is stored in S3
-2. Step Functions orchestrates the ML workflow
-3. Preprocessing prepares training-ready features
-4. Drift detection checks for concept/data changes
-5. SageMaker trains a challenger model
-6. The challenger is evaluated against the champion
-7. If performance improves, the new model is deployed
+1. Raw transaction data is ingested into Amazon S3  
+2. Step Functions orchestrates the end-to-end ML pipeline
+3. SageMaker Processing performs feature engineering and drift checks  
+4. Drift detection evaluates model performance degradation  
+5. If drift is detected, SageMaker Training retrains a challenger model  
+6. The challenger model is evaluated against the champion model  
+7. The system conditionally deploys the best-performing model  
 
-## Tech Stack
-- Python
-- AWS Lambda
-- AWS Step Functions
-- Amazon SageMaker
-- Amazon S3
-- XGBoost
-- CloudWatch
+
+---
+
+## 🚨 Key Design Decisions
+
+- **F1 Score as Primary Metric:**  
+  Chosen due to class imbalance in fraud detection, balancing precision and recall.
+
+- **Drift Threshold Selection (0.1):**  
+  Tuned to balance sensitivity vs false positives in retraining triggers.
+
+- **Champion/Challenger Strategy:**  
+  Ensures only improved models are deployed, preventing regression.
+
+- **S3-Based State Management:**  
+  Enables persistence of historical test data for consistent evaluation.
+
 
 ---
 
@@ -112,13 +122,7 @@ This project mirrors a production-style MLOps system using AWS:
 - `dashboard/` – (future) monitoring tools
 - `tests/` – Unit/integration tests
 
-## Results
-- Automated retraining pipeline
-- Model evaluation artifacts
-- Champion/challenger selection
-- Successful endpoint deployment
-
-## Results
+## 📊 Results & Model Performance
 
 | Stage | F1 Score |
 |------|--------|
@@ -127,22 +131,11 @@ This project mirrors a production-style MLOps system using AWS:
 | Concept Drift Dataset | 0.12 |
 | Retrained Model | 0.21 |
 
-**Outcome:**
-- Successfully detected concept drift
-- Triggered retraining pipeline
-- Deployed improved challenger model
-
-
-## 📈 Model Performance
-
-| Model        | F1 Score |
-|-------------|--------|
-| Baseline     | 0.79   |
-| Challenger   | 0.21   |
-| Drift Dataset| 0.12   |
-
-- Drift detection triggered when F1 dropped below threshold
-- Retraining improved performance before deployment
+**Key Outcomes:**
+- Successfully detected concept drift  
+- Triggered automated retraining pipeline  
+- Improved model performance before deployment  
+- Validated champion/challenger selection logic  
 
 
 ## Key Engineering Challenges & Solutions
@@ -210,13 +203,15 @@ Failures required tracing across:
 
 ## Why This Project Matters
 
-This project demonstrates:
+This project demonstrates real-world machine learning engineering skills, including:
 
-- Designing and debugging distributed ML systems
-- Handling stateful data pipelines in cloud environments
-- Implementing automated retraining and deployment logic
-- Working across multiple AWS services in production-like workflows
-- Applying machine learning concepts (F1, drift detection) in real systems
+- Designing and orchestrating distributed ML systems  
+- Managing stateful data pipelines in cloud environments  
+- Implementing automated model retraining and deployment logic  
+- Debugging cross-service failures in AWS (Lambda, Step Functions, SageMaker, S3)  
+- Applying ML concepts (F1 score, concept drift) in production-like workflows  
+
+Unlike typical ML projects, this system focuses on the full lifecycle of machine learning in production, not just model training.
 
 
 
@@ -230,10 +225,11 @@ This project demonstrates:
 
 ## ⚙️ How to Run
 
-1. Upload dataset to S3 `raw/`
-2. Trigger Step Functions workflow
-3. Monitor execution in AWS Console
-4. Review outputs in `staging/` bucket
+1. Upload dataset to S3 under the `raw/` prefix  
+2. Trigger the Step Functions workflow  
+3. Monitor execution via AWS Console / CloudWatch logs  
+4. Review outputs in the `staging/` S3 bucket  
+5. Validate model performance using generated evaluation artifacts  
 
 ## Author
 Tedra Birch |
