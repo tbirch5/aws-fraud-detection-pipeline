@@ -1,14 +1,62 @@
 # Fraud Detection MLOps Pipeline on AWS
 
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+![AWS](https://img.shields.io/badge/AWS-SageMaker-orange)
+![MLOps](https://img.shields.io/badge/MLOps-Pipeline-green)
+
+# 🚀 Fraud Detection MLOps Pipeline on AWS
+
+> End-to-end production-style machine learning pipeline with automated drift detection, retraining, and deployment using AWS.
+
+![Architecture](docs/diagrams/architecture.png)
+
+### 🔧 Built With
+AWS Step Functions • SageMaker • Lambda • S3 • XGBoost • Python
+
+
 ## Overview
 This project implements a production-style MLOps pipeline for fraud detection on AWS. It simulates a real-world system where models must continuously adapt to changing data distributions (concept drift). The pipeline automatically detects performance degradation, retrains models, and conditionally deploys improved models using a champion/challenger framework. The system integrates AWS Step Functions, Lambda, SageMaker, and S3 to orchestrate a fully automated, state-aware machine learning lifecycle.
 
+---
 
 ## Problem Statement
 Fraud detection systems must adapt to changing transaction behavior over time. This pipeline addresses that challenge by orchestrating automated model retraining and deployment decisions based on evaluation metrics and drift-aware workflow logic.
 
-## Architecture
-docs/screenshots/fraud_architecture.png
+
+## ✨ Key Features
+
+- ✅ Automated concept drift detection  
+- ✅ Conditional model retraining pipeline  
+- ✅ Champion/Challenger deployment strategy  
+- ✅ Fully orchestrated ML workflow using Step Functions  
+- ✅ Scalable cloud-native architecture (AWS)  
+
+
+---
+
+## 🏗️ Architecture Overview
+
+::contentReference[oaicite:0]{index=0}
+
+The pipeline orchestrates:
+- Data ingestion → preprocessing → drift detection  
+- Conditional retraining using SageMaker  
+- Champion/Challenger evaluation  
+- Automated deployment decisions  
+
+
+---
+
+## ⚡ Pipeline Execution (Real Run)
+
+### Step Functions Workflow
+![Step Functions](step_functions/step_functions_graph.png)
+
+### Drift Detection Logs
+![Drift Logs](docs/screenshots/drift_logs.png)
+
+### Model Evaluation Results
+![Evaluation](docs/screenshots/evaluation_logs.png)
 
 
 ## Cloud Architecture Mapping
@@ -52,6 +100,8 @@ This project mirrors a production-style MLOps system using AWS:
 - XGBoost
 - CloudWatch
 
+---
+
 ## Repository Structure
 
 - `data/` – Raw and processed datasets
@@ -82,8 +132,18 @@ This project mirrors a production-style MLOps system using AWS:
 - Triggered retraining pipeline
 - Deployed improved challenger model
 
-## Screenshots
-(pending post latest model run 4.13.26)
+
+## 📈 Model Performance
+
+| Model        | F1 Score |
+|-------------|--------|
+| Baseline     | 0.79   |
+| Challenger   | 0.21   |
+| Drift Dataset| 0.12   |
+
+- Drift detection triggered when F1 dropped below threshold
+- Retraining improved performance before deployment
+
 
 ## Key Engineering Challenges & Solutions
 
@@ -166,6 +226,14 @@ This project demonstrates:
 - GitHub Actions CI/CD
 - SNS alerts for drift and failed deployments
 - Model registry integration
+
+
+## ⚙️ How to Run
+
+1. Upload dataset to S3 `raw/`
+2. Trigger Step Functions workflow
+3. Monitor execution in AWS Console
+4. Review outputs in `staging/` bucket
 
 ## Author
 Tedra Birch |
