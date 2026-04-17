@@ -87,7 +87,7 @@ This project mirrors a production-style MLOps system using AWS:
 ### Observability
 - CloudWatch logs used to debug pipeline across distributed services
 
-## Workflow
+## General Workflow
 1. Raw transaction data is ingested into Amazon S3  
 2. Step Functions orchestrates the end-to-end ML pipeline
 3. SageMaker Processing performs feature engineering and drift checks  
@@ -98,6 +98,35 @@ This project mirrors a production-style MLOps system using AWS:
 
 
 ---
+
+## ⚙️ System Workflow
+1. Data Ingestion
+- New transaction data is uploaded to S3 (raw/)
+
+2. Preprocessing + Drift Detection
+- SageMaker Processing job prepares features
+- Drift is detected using F1 degradation threshold
+
+3. Decision: Drift Detected?
+- If NO → retain current model
+- If YES → trigger retraining pipeline
+
+4. Model Training (Challenger)
+- Train new XGBoost model on updated dataset
+
+5. Model Evaluation
+- Compare challenger vs production (champion)
+
+6. Champion/Challenger Selection
+- If challenger performs better → deploy
+- Otherwise → retain existing model
+
+7. Deployment
+- Best model is deployed to a SageMaker endpoint
+
+
+---
+
 
 ## 🚨 Key Design Decisions
 
@@ -116,6 +145,18 @@ This project mirrors a production-style MLOps system using AWS:
 
 ---
 
+## 🧰 Tech Stack
+
+- Python
+- AWS Step Functions
+- AWS Lambda
+- Amazon SageMaker
+- Amazon S3
+- XGBoost
+- CloudWatch (logging & observability)
+
+---
+
 ## Repository Structure
 
 - `data/` – Raw and processed datasets
@@ -123,8 +164,11 @@ This project mirrors a production-style MLOps system using AWS:
 - `sagemaker/` – Training, preprocessing, evaluation scripts
 - `step_functions/` – State machine definitions
 - `artifacts/` – Model artifacts and outputs
+- `docs/` – Architecture diagrams, screenshots, design notes
 - `dashboard/` – (future) monitoring tools
+- `notebooks/` – Exploration and experimentation
 - `tests/` – Unit/integration tests
+- `README.md/` 
 
 ## 📊 Results & Model Performance
 
@@ -218,7 +262,6 @@ This project demonstrates real-world machine learning engineering skills, includ
 Unlike typical ML projects, this system focuses on the full lifecycle of machine learning in production, not just model training.
 
 
-
 ## Future Improvements
 - FastAPI inference layer
 - Streamlit monitoring dashboard
@@ -235,7 +278,7 @@ Unlike typical ML projects, this system focuses on the full lifecycle of machine
 4. Review outputs in the `staging/` S3 bucket  
 5. Validate model performance using generated evaluation artifacts  
 
-## Author
-Tedra Birch |
-University of Illinois Urbana - Champaign | 
-Siebel School of Computing
+👩🏽‍💻 Author
+Tedra Birch
+University of Illinois Urbana-Champaign
+Master Computer Science (Machine Learning Track)
