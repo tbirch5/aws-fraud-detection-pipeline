@@ -1,0 +1,321 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "PreprocessingAndDriftCheck",
+  "States": {
+    "PreprocessingAndDriftCheck": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:createProcessingJob.sync",
+      "Arguments": {
+        "ProcessingJobName": "{% $states.input.id %}",
+        "RoleArn": "arn:aws:iam::025449143679:role/service-role/SageMaker-SageMakerIAMRole",
+        "AppSpecification": {
+          "ImageUri": "683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-scikit-learn:0.23-1-cpu-py3",
+          "ContainerEntrypoint": [
+            "python3",
+            "/opt/ml/processing/input/code/drift_preproc.py"
+          ],
+          "ContainerArguments": [
+            "--raw-data-uri",
+            "{% $states.input.s3InputUri %}",
+            "--test-data-uri",
+            "{% $states.input.s3TestDataUri %}",
+            "--processed-data-uri",
+            "{% $states.input.s3ProcessedOutputUri %}",
+            "--file-name",
+            "{% $states.input.fileName %}",
+            "--staging",
+            "{% $states.input.s3StagingUri %}"
+          ]
+        },
+        "ProcessingResources": {
+          "ClusterConfig": {
+            "InstanceCount": 1,
+            "InstanceType": "ml.t3.medium",
+            "VolumeSizeInGB": 10
+          }
+        },
+        "ProcessingInputs": [
+          {
+            "InputName": "input",
+            "S3Input": {
+              "S3Uri": "s3://amzn-mp10-scripts-bucket/code/",
+              "LocalPath": "/opt/ml/processing/input/code",
+              "S3DataType": "S3Prefix",
+              "S3InputMode": "File"
+            }
+          }
+        ],
+        "ProcessingOutputConfig": {
+          "Outputs": [
+            {
+              "OutputName": "output",
+              "S3Output": {
+                "S3Uri": "s3://amzn-mp10-models-bucket/staging/",
+                "LocalPath": "/opt/ml/processing/output",
+                "S3UploadMode": "EndOfJob"
+              }
+            }
+          ]
+        }
+      },
+      "Next": "Get Drift Data",
+      "Output": {
+        "id": "{% $states.input.id %}",
+        "fileName": "{% $states.input.fileName %}",
+        "s3InputUri": "{% $states.input.s3InputUri %}",
+        "s3ProcessedOutputUri": "{% $states.input.s3ProcessedOutputUri %}",
+        "s3TestDataUri": "{% $states.input.s3TestDataUri %}",
+        "s3StagingUri": "{% $states.input.s3StagingUri %}"
+      }
+    },
+    "Get Drift Data": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Arguments": {
+        "FunctionName": "arn:aws:lambda:us-east-1:025449143679:function:GetDataDriftLambda:$LATEST",
+        "Payload": "{% $states.input %}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "DriftChoice",
+      "Output": {
+        "id": "{% $states.input.id %}",
+        "fileName": "{% $states.input.fileName %}",
+        "s3InputUri": "{% $states.input.s3InputUri %}",
+        "s3ProcessedOutputUri": "{% $states.input.s3ProcessedOutputUri %}",
+        "s3TestDataUri": "{% $states.input.s3TestDataUri %}",
+        "s3StagingUri": "{% $states.input.s3StagingUri %}",
+        "drift_detected": "{% $states.result.Payload.drift_detected %}",
+        "old_test_set_f1": "{% $states.result.Payload.old_test_set_f1 %}",
+        "new_test_set_f1": "{% $states.result.Payload.new_test_set_f1 %}"
+      }
+    },
+    "DriftChoice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Model Training",
+          "Condition": "{% $states.input.drift_detected = true %}",
+          "Output": {
+            "id": "{% $states.input.id %}",
+            "fileName": "{% $states.input.fileName %}",
+            "s3InputUri": "{% $states.input.s3InputUri %}",
+            "s3ProcessedOutputUri": "{% $states.input.s3ProcessedOutputUri %}",
+            "s3TestDataUri": "{% $states.input.s3TestDataUri %}",
+            "s3StagingUri": "{% $states.input.s3StagingUri %}"
+          }
+        }
+      ],
+      "Default": "Retain Model"
+    },
+    "Model Training": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:createTrainingJob.sync",
+      "Arguments": {
+        "TrainingJobName": "{% $states.input.id & '-training' %}",
+        "RoleArn": "arn:aws:iam::025449143679:role/service-role/SageMaker-SageMakerIAMRole",
+        "AlgorithmSpecification": {
+          "TrainingImage": "683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-scikit-learn:0.23-1-cpu-py3",
+          "TrainingInputMode": "File",
+          "ContainerEntrypoint": [
+            "python3"
+          ],
+          "ContainerArguments": [
+            "/opt/ml/input/data/script/train.py",
+            "{% 'processed_' & $states.input.fileName %}",
+            "{% $states.input.s3StagingUri %}"
+          ]
+        },
+        "InputDataConfig": [
+          {
+            "ChannelName": "train",
+            "DataSource": {
+              "S3DataSource": {
+                "S3DataType": "S3Prefix",
+                "S3Uri": "s3://amzn-mp10-fraud-detection/processed/",
+                "S3DataDistributionType": "FullyReplicated"
+              }
+            },
+            "ContentType": "text/csv",
+            "InputMode": "File"
+          },
+          {
+            "ChannelName": "script",
+            "DataSource": {
+              "S3DataSource": {
+                "S3DataType": "S3Prefix",
+                "S3Uri": "s3://amzn-mp10-scripts-bucket/code/",
+                "S3DataDistributionType": "FullyReplicated"
+              }
+            },
+            "ContentType": "text/x-python",
+            "InputMode": "File"
+          }
+        ],
+        "OutputDataConfig": {
+          "S3OutputPath": "s3://amzn-mp10-models-bucket/staging/"
+        },
+        "ResourceConfig": {
+          "InstanceCount": 1,
+          "InstanceType": "ml.m5.large",
+          "VolumeSizeInGB": 10
+        },
+        "StoppingCondition": {
+          "MaxRuntimeInSeconds": 3600
+        }
+      },
+      "Next": "Model Evaluation",
+      "Output": {
+        "id": "{% $states.input.id %}",
+        "fileName": "{% $states.input.fileName %}",
+        "s3InputUri": "{% $states.input.s3InputUri %}",
+        "s3TestDataUri": "{% $states.input.s3TestDataUri %}",
+        "s3StagingUri": "{% $states.input.s3StagingUri %}"
+      }
+    },
+    "Model Evaluation": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:createProcessingJob.sync",
+      "Arguments": {
+        "ProcessingJobName": "{% $states.input.id & '-evaluation' %}",
+        "RoleArn": "arn:aws:iam::025449143679:role/service-role/SageMaker-SageMakerIAMRole",
+        "AppSpecification": {
+          "ImageUri": "683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-scikit-learn:0.23-1-cpu-py3",
+          "ContainerEntrypoint": [
+            "python3"
+          ],
+          "ContainerArguments": [
+            "/opt/ml/processing/input/code/evaluate.py",
+            "{% 's3://amzn-mp10-models-bucket/staging/' & $states.input.id & '-training/output/model.tar.gz' %}",
+            "s3://amzn-mp10-fraud-detection/test/",
+            "--test-file",
+            "/opt/ml/processing/input/data/combined_test.csv"
+          ]
+        },
+        "ProcessingResources": {
+          "ClusterConfig": {
+            "InstanceCount": 1,
+            "InstanceType": "ml.t3.medium",
+            "VolumeSizeInGB": 10
+          }
+        },
+        "ProcessingInputs": [
+          {
+            "InputName": "code",
+            "S3Input": {
+              "S3Uri": "s3://amzn-mp10-scripts-bucket/code/",
+              "LocalPath": "/opt/ml/processing/input/code",
+              "S3DataType": "S3Prefix",
+              "S3InputMode": "File"
+            }
+          },
+          {
+            "InputName": "data",
+            "S3Input": {
+              "S3Uri": "s3://amzn-mp10-fraud-detection/test/",
+              "LocalPath": "/opt/ml/processing/input/data",
+              "S3DataType": "S3Prefix",
+              "S3InputMode": "File"
+            }
+          }
+        ],
+        "ProcessingOutputConfig": {
+          "Outputs": [
+            {
+              "OutputName": "evaluation",
+              "S3Output": {
+                "S3Uri": "s3://amzn-mp10-models-bucket/staging/",
+                "LocalPath": "/opt/ml/processing/output",
+                "S3UploadMode": "EndOfJob"
+              }
+            }
+          ]
+        }
+      },
+      "Next": "Get F1 Scores",
+      "Output": {
+        "id": "{% $states.input.id %}"
+      }
+    },
+    "Get F1 Scores": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": {
+        "id": "{% $states.input.id %}",
+        "is_better": "{% $states.result.Payload.is_better %}",
+        "challenger_f1": "{% $states.result.Payload.challenger_f1 %}",
+        "champion_f1": "{% $states.result.Payload.champion_f1 %}"
+      },
+      "Arguments": {
+        "FunctionName": "arn:aws:lambda:us-east-1:025449143679:function:ChanmpionChallengerF1Lambda:$LATEST",
+        "Payload": "{% $states.input %}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "F1Choice"
+    },
+    "F1Choice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Deploy Model and Endpoint",
+          "Condition": "{% $states.input.is_better = true %}"
+        }
+      ],
+      "Default": "Retain Model"
+    },
+    "Deploy Model and Endpoint": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "arn:aws:lambda:us-east-1:025449143679:function:DeployTrainedModel:$LATEST",
+        "Payload": "{% $states.input %}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "End": true
+    },
+    "Retain Model": {
+      "Type": "Pass",
+      "End": true
+    }
+  },
+  "QueryLanguage": "JSONata"
+}

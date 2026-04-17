@@ -1,0 +1,6 @@
+As soon as new raw data is uploaded into the designated S3 “raw” folder, a trigger Lambda function constructs and gathers all necessary metadata, and starts a Step Functions state machine to coordinate the subsequent steps. 
+The Step Functions workflow first initiates a SageMaker Processing job to preprocess the incoming data and detect any drift, identifying whether the model's accuracy has decreased significantly compared to past performance. If drift is detected the workflow moves forward by running a SageMaker Training job to train or update a fraud-detection model with the latest data.
+
+After training, another Processing job evaluates the newly trained "challenger" model against the current "champion" model using a common test dataset. Based on this evaluation, the pipeline automatically selects and deploys the superior model to a SageMaker endpoint, ensuring the live system consistently maintains the highest possible accuracy.
+
+This fully automated pipeline ensures that models stay robust, up-to-date, and continuously improve over time with minimal manual intervention. 
