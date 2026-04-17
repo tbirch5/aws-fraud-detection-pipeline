@@ -5,6 +5,10 @@
 
 # 🚀 Fraud Detection MLOps Pipeline on AWS
 
+🚀 Designed and implemented a production-style MLOps pipeline that automatically detects model drift, retrains models, and deploys improved versions using a fully serverless AWS architecture.
+
+📊 Achieved up to 0.79 F1 score on baseline data and demonstrated performance degradation under concept drift, triggering automated retraining.
+
 > End-to-end production-style machine learning pipeline with automated drift detection, retraining, and deployment using AWS.
 
 ![Architecture](docs/diagrams/architecture.png)
